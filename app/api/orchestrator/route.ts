@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import type { OrchestratorDecision, Signal } from "../../../../types";
+import type { OrchestratorDecision, Signal } from "../../../types";
 
 function route(intent: string): { agent: OrchestratorDecision["assignedAgentId"]; tier: 1 | 2 | 3 } {
   if (intent === "refund_request" || intent === "payment") return { agent: "bookshield", tier: 3 };

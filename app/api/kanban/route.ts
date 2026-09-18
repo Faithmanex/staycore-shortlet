@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { ALLOWED_TRANSITIONS, type KanbanStatus, type Task } from "../../../../types";
+import { ALLOWED_TRANSITIONS, type KanbanStatus, type Task } from "../../../types";
 
 const tasks = new Map<string, Task>();
 

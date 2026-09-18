@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import crypto from "crypto";
-import type { Approval } from "../../../../types";
+import type { Approval } from "../../../types";
 
 const approvals = new Map<string, Approval>();
 

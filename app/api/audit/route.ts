@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import crypto from "crypto";
-import type { AuditEvent } from "../../../../types";
+import type { AuditEvent } from "../../../types";
 
 const events: AuditEvent[] = [];
 let seq = 0;
