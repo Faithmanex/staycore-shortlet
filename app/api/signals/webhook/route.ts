@@ -1,7 +1,8 @@
 import { NextResponse } from "next/server";
 import type { Signal, Urgency } from "../../../../types";
+import { appendAudit, nextId, signals } from "../../../../lib/store";
 
-const store: Signal[] = [];
+export const dynamic = "force-dynamic";
 
 function classify(text: string): { intent: string; urgency: Urgency } {
   const t = text.toLowerCase();
@@ -15,29 +16,65 @@ function classify(text: string): { intent: string; urgency: Urgency } {
 }
 
 export async function POST(req: Request) {
+  const t0 = Date.now();
   const body = (await req.json().catch(() => ({}))) as Record<string, unknown>;
   const text = String(body.text ?? body.message ?? JSON.stringify(body)).slice(0, 2000);
   const { intent, urgency } = classify(text);
+  const tenant_id = String(body.tenant_id ?? "demo-tenant");
   const signal: Signal = {
-    id: `sig_${Date.now().toString(36)}`,
+    id: nextId("sig"),
     source: (body.source as Signal["source"]) ?? "webhook",
     provider: (body.provider as Signal["provider"]) ?? "whatsapp",
     rawPayload: body,
     normalizedData: {
       customerName: (body.guestName as string) ?? (body.from as string),
       contactInfo: (body.from as string) ?? (body.phone as string),
-      intent, urgency, summary: text.slice(0, 280),
+      intent,
+      urgency,
+      summary: text.slice(0, 280),
       unitIdOrArea: (body.unitId as string) ?? (body.area as string),
     },
-    intent, urgency,
-    tenant_id: String(body.tenant_id ?? "demo-tenant"),
+    intent,
+    urgency,
+    tenant_id,
     status: "pending",
     createdAt: new Date().toISOString(),
   };
-  store.unshift(signal);
+  signals.unshift(signal);
+  appendAudit({
+    tenant_id,
+    taskId: signal.id,
+    signalId: signal.id,
+    actor: { type: "system", id: "signal_bus", name: "Signal Bus" },
+    action: `signal.received:${intent}`,
+    latencyMs: Date.now() - t0,
+  });
   return NextResponse.json({ signal });
 }
 
+export async function PATCH(req: Request) {
+  const { id, status, assignedAgentId } = (await req.json().catch(() => ({}))) as {
+    id?: string;
+    status?: Signal["status"];
+    assignedAgentId?: string;
+  };
+  const s = signals.find((x) => x.id === id);
+  if (!s) return NextResponse.json({ error: "not found" }, { status: 404 });
+  if (status && !["pending", "assigned", "dismissed"].includes(status)) {
+    return NextResponse.json({ error: "bad status" }, { status: 422 });
+  }
+  if (status) s.status = status;
+  if (assignedAgentId) s.assignedAgentId = assignedAgentId;
+  appendAudit({
+    tenant_id: s.tenant_id,
+    taskId: s.id,
+    signalId: s.id,
+    actor: { type: "human", id: "human_owner", name: "Owner" },
+    action: `signal.${status ?? "rerouted"}`,
+  });
+  return NextResponse.json({ signal: s });
+}
+
 export async function GET() {
-  return NextResponse.json({ signals: store.slice(0, 100) });
+  return NextResponse.json({ signals: signals.slice(0, 100) });
 }

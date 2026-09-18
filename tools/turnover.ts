@@ -5,6 +5,7 @@ export const TurnoverInput = z.object({
   checkoutAt: z.string().min(1),
   checkinAt: z.string().min(1),
   cleanerId: z.string().optional(),
+  cleanerPhone: z.string().optional(),
 });
 
 export type TurnoverInput = z.infer<typeof TurnoverInput>;
@@ -14,18 +15,24 @@ export const turnover_dispatch = {
   description: "Assign cleaner, set 3hr SLA, notify WhatsApp",
   safetyTier: 2 as const,
   parameters: TurnoverInput,
-  async execute(input: TurnoverInput, env: { WHATSAPP_TOKEN?: string } = {}) {
+  async execute(
+    input: TurnoverInput,
+    env: { WHATSAPP_TOKEN?: string; WHATSAPP_PHONE_ID?: string } = {},
+  ) {
     const p = TurnoverInput.parse(input);
     const slaMinutes = 180;
     const message = `Turnover • Unit ${p.unitId} • Checkout ${p.checkoutAt} → Ready before ${p.checkinAt} • SLA ${slaMinutes}min • Checklist: linens, AC, water heater, toiletries, photos required`;
-    if (env.WHATSAPP_TOKEN && p.cleanerId) {
-      await fetch(`https://graph.facebook.com/v20.0/${p.cleanerId}/messages`, {
+    const to = p.cleanerPhone ?? p.cleanerId;
+    let notified = false;
+    if (env.WHATSAPP_TOKEN && env.WHATSAPP_PHONE_ID && to) {
+      const res = await fetch(`https://graph.facebook.com/v20.0/${env.WHATSAPP_PHONE_ID}/messages`, {
         method: "POST",
         headers: { Authorization: `Bearer ${env.WHATSAPP_TOKEN}`, "Content-Type": "application/json" },
-        body: JSON.stringify({ messaging_product: "whatsapp", to: p.cleanerId, type: "text", text: { body: message } }),
-      }).catch(() => undefined);
+        body: JSON.stringify({ messaging_product: "whatsapp", to, type: "text", text: { body: message } }),
+      }).catch(() => null);
+      notified = res !== null && res.ok;
     }
-    return { assigned: p.cleanerId ?? "round-robin", slaMinutes, message, notified: Boolean(env.WHATSAPP_TOKEN && p.cleanerId) };
+    return { assigned: p.cleanerId ?? "round-robin", slaMinutes, message, notified };
   },
 };
 

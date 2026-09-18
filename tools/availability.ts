@@ -14,7 +14,7 @@ export const availability_lookup = {
   description: "Check Sheets/PMS calendar for unit availability over date range",
   safetyTier: 1 as const,
   parameters: AvailabilityInput,
-  async execute(input: AvailabilityInput, env: { SHEETS_ID?: string; PMS_API_KEY?: string } = {}) {
+  async execute(input: AvailabilityInput, env: { SHEETS_ID?: string; PMS_API_KEY?: string; GOOGLE_API_KEY?: string } = {}) {
     const parsed = AvailabilityInput.parse(input);
     try {
       if (env.PMS_API_KEY) {
@@ -26,7 +26,7 @@ export const availability_lookup = {
         return { available: Boolean(data.available), source: "pms", detail: data };
       }
       if (env.SHEETS_ID) {
-        const res = await fetch(`https://sheets.googleapis.com/v4/spreadsheets/${env.SHEETS_ID}/values/Bookings!A:E?key=${(env as Record<string, string>).GOOGLE_API_KEY ?? ""}`);
+        const res = await fetch(`https://sheets.googleapis.com/v4/spreadsheets/${env.SHEETS_ID}/values/Bookings!A:E?key=${env.GOOGLE_API_KEY ?? ""}`);
         if (!res.ok) throw new Error(`Sheets ${res.status}`);
         const data = await res.json();
         return { available: true, source: "sheets", note: "manual-review-recommended", detail: data };
